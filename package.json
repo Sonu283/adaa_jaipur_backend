@@ -1,0 +1,26 @@
+{
+  "name": "adaa-jaipur-modified",
+  "version": "1.0.0",
+  "description": "adaa jaipur application",
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "start": "nodemon index.js",
+    "build": "netlify deploy --prod"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "firebase": "^11.2.0",
+    "netlify-lambda": "^2.0.16",
+    "nodemon": "^3.1.9",
+    "serverless-http": "^3.2.0"
+  },
+  "devDependencies": {
+    "ajv": "^7.2.4"
+  }
+}
