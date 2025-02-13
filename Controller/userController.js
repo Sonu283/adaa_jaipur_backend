@@ -12,56 +12,105 @@ const {
   arrayRemove,
 } = require("firebase/firestore");
 
+// async function SignupUser(req, res) {
+//   try {
+//     const { name, phNumber, email, address, dob } = req.body;
+//     console.log( name, phNumber, email, address, dob );
+
+//     // Check if all fields are provided
+//     if (!name || !phNumber || !email || !address || !dob) {
+//       return res.status(400).json({ message: "All fields are required" });
+//     }
+
+//     const phoneQuery = query(User, where("phNumberD", "==", phNumber));
+//     const phoneSnapshot = await getDocs(phoneQuery);
+
+//     if (!phoneSnapshot.empty) {
+//       return res
+//         .status(400)
+//         .json({ message: "User with this phone number already exists" });
+//     }
+
+//     // Check if a user with the same email already exists
+//     const q = query(User, where("emailD", "==", email));
+//     const querySnapshot = await getDocs(q);
+
+//     if (!querySnapshot.empty) {
+//       return res
+//         .status(400)
+//         .json({ message: "User with this email already exists" });
+//     }
+
+
+//     // Create a new user document with a unique ID
+//     const newUser = {
+//       nameD: name,
+//       phNumberD: phNumber,
+//       emailD: email.toLowerCase(),
+//       addressD: address,
+//       dobD: dob
+//     };
+
+//     // Add the new user to Firestore
+//     await addDoc(User, newUser); // Add user document
+
+//     // Send a success response
+//     res.status(201).json({ message: "User registered successfully!", newUser });
+//   } catch (err) {
+//     console.error("Error registering user:", err);
+//     res.status(500).json({ error: "Error registering user", details: err });
+//   }
+// }
 async function SignupUser(req, res) {
-  console.log("User signup executed");
   try {
-    const { name, phNumber, email, address, dob, password } = req.body;
+    const { name, phNumber, email, address, dob } = req.body;
 
     // Check if all fields are provided
-    if (!name || !phNumber || !email || !address || !dob || !password) {
+    if (!name || !phNumber || !email || !address || !dob) {
       return res.status(400).json({ message: "All fields are required" });
     }
 
+    // Check if user exists by phone number
     const phoneQuery = query(User, where("phNumberD", "==", phNumber));
     const phoneSnapshot = await getDocs(phoneQuery);
 
-    if (!phoneSnapshot.empty) {
-      return res
-        .status(400)
-        .json({ message: "User with this phone number already exists" });
+    // Check if user exists by email
+    const emailQuery = query(User, where("emailD", "==", email.toLowerCase()));
+    const emailSnapshot = await getDocs(emailQuery);
+
+    // If user exists, return login success
+    if (!phoneSnapshot.empty || !emailSnapshot.empty) {
+      const existingUser = phoneSnapshot.empty ? emailSnapshot.docs[0].data() : phoneSnapshot.docs[0].data();
+      return res.status(200).json({ 
+        message: "User already exists. Logged in successfully!", 
+        user: existingUser 
+      });
     }
 
-    // Check if a user with the same email already exists
-    const q = query(User, where("emailD", "==", email));
-    const querySnapshot = await getDocs(q);
-
-    if (!querySnapshot.empty) {
-      return res
-        .status(400)
-        .json({ message: "User with this email already exists" });
-    }
-
-    // Hash the password before saving it
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create a new user document with a unique ID
+    // Create a new user document
     const newUser = {
       nameD: name,
       phNumberD: phNumber,
       emailD: email.toLowerCase(),
       addressD: address,
-      dobD: dob,
-      passwordD: hashedPassword,
+      dobD: dob
     };
 
     // Add the new user to Firestore
-    await addDoc(User, newUser); // Add user document
+    await addDoc(User, newUser);
 
-    // Send a success response
-    res.status(201).json({ message: "User registered successfully!", newUser });
+    // Send a success response for new user registration
+    res.status(201).json({ 
+      message: "User registered successfully!", 
+      user: newUser 
+    });
+
   } catch (err) {
-    console.error("Error registering user:", err);
-    res.status(500).json({ error: "Error registering user", details: err });
+    console.error("Error processing user:", err);
+    res.status(500).json({ 
+      error: "Error processing user registration/login", 
+      details: err 
+    });
   }
 }
 
@@ -295,6 +344,247 @@ async function deleteFromCart(req, res) {
 }
 
 
+async function addToWishlist(req, res) {
+  try {
+    const { email, product } = req.body;
+
+    if (!email || !product) {
+      return res.status(400).json({ message: "Email and product are required" });
+    }
+
+    const q = query(User, where("emailD", "==", email));
+    const userSnapshot = await getDocs(q);
+
+    if (userSnapshot.empty) {
+      return res.status(404).json({ message: "User does not exist" });
+    }
+
+    const userDocRef = userSnapshot.docs[0].ref;
+    const userDoc = userSnapshot.docs[0].data();
+    const wishlistItems = userDoc.wishlist || [];
+
+    const productExists = wishlistItems.some(item => item.idD === product.idD);
+
+    if (productExists) {
+      await updateDoc(userDocRef, {
+        wishlist: arrayRemove(wishlistItems.find(item => item.idD === product.idD))
+      });
+      return res.status(200).json({ 
+        message: "Product removed from wishlist",
+        success: true,
+        updatedWishlist: wishlistItems.filter(item => item.idD !== product.idD)
+      });
+    }
+
+    await updateDoc(userDocRef, {
+      wishlist: arrayUnion(product)
+    });
+
+    return res.status(200).json({ 
+      message: "Product added to wishlist",
+      success: true,
+      updatedWishlist: [...wishlistItems, product]
+    });
+  } catch (err) {
+    console.error("Error updating wishlist:", err);
+    res.status(500).json({ 
+      error: "Error updating wishlist", 
+      details: err.message 
+    });
+  }
+}
+
+// async function getWishlist(req, res) {
+//   try {
+//     const { email } = req.params;
+
+//     if (!email) {
+//       return res.status(400).json({ message: "Email is required" });
+//     }
+
+//     // Ensure 'User' refers to the collection
+//     const userCollection = collection(db, "users"); // Adjust 'users' if your collection name is different
+//     const q = query(userCollection, where("emailD", "==", email)); // Match field name with frontend
+    
+//     const userSnapshot = await getDocs(q);
+
+//     if (userSnapshot.empty) {
+//       return res.status(404).json({ message: "User does not exist" });
+//     }
+
+//     const userDoc = userSnapshot.docs[0].data();
+//     const wishlistItems = userDoc.wishlist || [];
+
+//     return res.status(200).json({ 
+//       message: "Wishlist retrieved successfully", 
+//       wishlist: wishlistItems 
+//     });
+//   } catch (err) {
+//     console.error("Error retrieving wishlist:", err);
+//     res.status(500).json({ 
+//       error: "An unexpected error occurred" // Hide detailed error from client
+//     });
+//   }
+// }
+
+async function getWishlist(req, res) {
+  try {
+    const { email } = req.query; // Using req.query to get the email from query parameters
+
+    // Validate the input
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    // Query Firestore to find the user by email
+    const q = query(User, where("emailD", "==", email)); 
+    const userSnapshot = await getDocs(q);
+
+    // Check if the user exists
+    if (userSnapshot.empty) {
+      return res.status(404).json({ message: "User does not exist" });
+    }
+
+    // Assuming the first matching document is the user's data
+    const userDoc = userSnapshot.docs[0].data();
+    const wishlistItems = userDoc.wishlist || []; // Default to an empty array if wishlist is undefined
+
+    // Send the wishlist items in the response
+    return res.status(200).json({ 
+      message: "Wishlist retrieved successfully", 
+      success: true,
+      wishlist: wishlistItems 
+    });
+  } catch (err) {
+    console.error("Error retrieving wishlist:", err);
+    res.status(500).json({ 
+      error: "An unexpected error occurred", 
+      details: err.message 
+    });
+  }
+}
+async function removeFromWishlist(req, res) {
+  try {
+    const { email, productId } = req.body;
+
+    if (!email || !productId) {
+      return res.status(400).json({ message: "Email and product ID are required" });
+    }
+
+    const q = query(User, where("emailD", "==", email));
+    const userSnapshot = await getDocs(q);
+
+    if (userSnapshot.empty) {
+      return res.status(404).json({ message: "User does not exist" });
+    }
+
+    const userDocRef = userSnapshot.docs[0].ref;
+    const userDoc = userSnapshot.docs[0].data();
+    const wishlistItems = userDoc.wishlist || [];
+
+    const productToRemove = wishlistItems.find(item => item.idD === productId);
+
+    if (!productToRemove) {
+      return res.status(404).json({ message: "Product not found in wishlist" });
+    }
+
+    await updateDoc(userDocRef, {
+      wishlist: arrayRemove(productToRemove)
+    });
+
+    return res.status(200).json({ 
+      message: "Product removed from wishlist successfully",
+      productId
+    });
+  } catch (err) {
+    console.error("Error removing from wishlist:", err);
+    res.status(500).json({ 
+      error: "Error removing from wishlist", 
+      details: err.message 
+    });
+  }
+}
+
+
+// Function to place an order and store it in the user's orders array
+async function placeOrder(req, res) {
+  try {
+    const { email, orderDetails,totalAmount  } = req.body;
+
+    // Validate input
+    if (!email || !orderDetails || orderDetails.length === 0||totalAmount === undefined) {
+      return res.status(400).json({ message: "Email and order details are required" });
+    }
+
+    // Query Firestore to check if the user exists
+    const userQuery = query(User, where("emailD", "==", email));
+    const userSnapshot = await getDocs(userQuery);
+
+    if (userSnapshot.empty) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Get user document reference
+    const userDocRef = userSnapshot.docs[0].ref;
+
+    // Prepare the order object with timestamp
+    const orderTimestamp = new Date();
+    const order = {
+      orderDetails: orderDetails,
+      totalAmount,
+      placedAt: orderTimestamp,  // Timestamp for when the order was placed
+      
+    };
+
+    // Add the order to the 'orders' array in the user's document
+    await updateDoc(userDocRef, {
+      orders: arrayUnion(order),
+      cart: [],
+    });
+
+    return res.status(201).json({ message: "Order placed successfully", order });
+  } catch (err) {
+    console.error("Error placing order:", err);
+    res.status(500).json({ error: "Error placing order", details: err.message });
+  }
+}
+
+// Function to get orders stored in the user's orders array
+async function getOrdersByDate(req, res) {
+  try {
+    const { email } = req.query;
+
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    // Query Firestore to check if the user exists
+    const userQuery = query(User, where("emailD", "==", email));
+    const userSnapshot = await getDocs(userQuery);
+
+    if (userSnapshot.empty) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Get user data (including orders array)
+    const userDoc = userSnapshot.docs[0].data();
+    const orders = userDoc.orders || [];  // Retrieve orders array from user document
+
+    // Sort orders by the placedAt timestamp
+    orders.sort((a, b) => b.placedAt.seconds - a.placedAt.seconds); // Sorting by most recent first
+
+    if (orders.length === 0) {
+      return res.status(404).json({ message: "No orders placed yet" });
+    }
+
+    return res.status(200).json({ orders });
+  } catch (err) {
+    console.error("Error retrieving orders:", err);
+    res.status(500).json({ error: "Error retrieving orders", details: err.message });
+  }
+}
+
+
 // module.exports = {addToCart};
 
 module.exports = {
@@ -304,5 +594,10 @@ module.exports = {
   userExists,
   addToCart,
   deleteFromCart,
-  getCart
+  getCart,
+  addToWishlist,
+  getWishlist,
+  removeFromWishlist,
+  placeOrder,
+  getOrdersByDate
 };

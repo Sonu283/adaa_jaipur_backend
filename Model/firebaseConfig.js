@@ -1,14 +1,15 @@
 const { initializeApp } = require('firebase/app');
 const { getFirestore, collection } = require('firebase/firestore');
+require('dotenv').config();
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDzu0OL-w9C0wblqY1YyY1RsvCHYJjcPP8",
-  authDomain: "adaa-jaipur-213ec.firebaseapp.com",
-  projectId: "adaa-jaipur-213ec",
-  storageBucket: "adaa-jaipur-213ec.firebasestorage.app",
-  messagingSenderId: "755020894693",
-  appId: "1:755020894693:web:015e042afe20caedeb1f0c",
-  measurementId: "G-NSHLPRK78X"
+  apiKey: process.env.API_KEY,
+  authDomain: process.env.AUTH_DOMAIN,
+  projectId: process.env.PROJECT_ID,
+  storageBucket: process.env.STORAGE_BUCKET,
+  messagingSenderId: process.env.MESSAGING_SENDER_ID,
+  appId: process.env.APP_ID,
+  measurementId: process.env.MEASUREMENT_ID
 };
 const app = initializeApp(firebaseConfig);
 
