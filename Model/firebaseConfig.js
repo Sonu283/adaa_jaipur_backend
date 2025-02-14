@@ -1,5 +1,6 @@
 const { initializeApp } = require('firebase/app');
 const { getFirestore, collection } = require('firebase/firestore');
+
 require('dotenv').config();
 
 const firebaseConfig = {
